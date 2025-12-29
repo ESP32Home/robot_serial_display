@@ -73,11 +73,11 @@
       "tile_id": "tile_hz",
       "title": "Pipeline Hz",
       "rows": [
-        { "id": "hz_nav", "label": "nav", "target": 20 },
+        { "id": "hz_driver", "label": "driver", "target": 10 },
         { "id": "hz_slam", "label": "slam", "target": 30 },
+        { "id": "hz_nav", "label": "nav", "target": 20 },
         { "id": "hz_tf", "label": "tf", "target": 50 },
         { "id": "hz_cam", "label": "cam", "target": 15 },
-        { "id": "hz_ctrl", "label": "ctrl", "target": 60 },
         { "id": "hz_diag", "label": "diag", "target": 1 }
       ]
     }
