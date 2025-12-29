@@ -1,4 +1,4 @@
-# 16_rovi_dasboard
+# robot_serial_display
 
 Simple LVGL dashboard demo for a robot (ROVI), targeting the 3.5" 320×480 ESP32‑S3 Touch LCD.
 
