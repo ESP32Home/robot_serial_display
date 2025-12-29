@@ -1,0 +1,8 @@
+{
+  "name": "WsLcd35S3Hal",
+  "version": "0.1.0",
+  "description": "Board/HAL bring-up for the Waveshare-like ESP32-S3 3.5\" 320x480 touch LCD (LVGL + FFat + touch).",
+  "frameworks": "arduino",
+  "platforms": "espressif32"
+}
+

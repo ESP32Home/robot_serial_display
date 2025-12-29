@@ -1,0 +1,85 @@
+{
+  "robot_name": "rovi",
+  "ui": {
+    "dark_theme": true,
+    "stale_timeout_ms": 5000,
+    "background": "#0B1220",
+    "splash": { "path": "/rovi.bmp", "duration_ms": 3000 }
+  },
+  "layout": {
+    "cols": 2,
+    "rows": 3,
+    "tiles": [
+      { "id": "tile_voltage" },
+      { "id": "tile_cpu" },
+      { "id": "tile_hz" },
+      { "id": "tile_shutdown" },
+      { "id": "tile_hz" },
+      { "id": "tile_restart" }
+    ]
+  },
+  "gauges": [
+    {
+      "id": "voltage",
+      "tile_id": "tile_voltage",
+      "title": "Voltage",
+      "min": 90,
+      "max": 130,
+      "initial": 121,
+      "initial_text": "12.1V",
+      "min_label": "9V",
+      "max_label": "13V",
+      "accent": "green",
+      "stages": [
+        { "t": 126, "c": "green" },
+        { "t": 111, "c": "green" },
+        { "t": 110, "c": "amber" },
+        { "t": 105, "c": "orange" },
+        { "t": 90, "c": "red" }
+      ]
+    },
+    {
+      "id": "cpu",
+      "tile_id": "tile_cpu",
+      "title": "CPU",
+      "min": 0,
+      "max": 100,
+      "initial": 37,
+      "initial_text": "37%",
+      "min_label": "0%",
+      "max_label": "100%",
+      "accent": "amber"
+    }
+  ],
+  "buttons": [
+    {
+      "tile_id": "tile_shutdown",
+      "tile_title": "Power",
+      "label": "Shutdown",
+      "color": "red",
+      "action_id": "shutdown"
+    },
+    {
+      "tile_id": "tile_restart",
+      "tile_title": "System",
+      "label": "Restart",
+      "color": "blue",
+      "action_id": "restart"
+    }
+  ],
+  "hz_lists": [
+    {
+      "id": "pipeline_hz",
+      "tile_id": "tile_hz",
+      "title": "Pipeline Hz",
+      "rows": [
+        { "id": "hz_nav", "label": "nav", "target": 20 },
+        { "id": "hz_slam", "label": "slam", "target": 30 },
+        { "id": "hz_tf", "label": "tf", "target": 50 },
+        { "id": "hz_cam", "label": "cam", "target": 15 },
+        { "id": "hz_ctrl", "label": "ctrl", "target": 60 },
+        { "id": "hz_diag", "label": "diag", "target": 1 }
+      ]
+    }
+  ]
+}
