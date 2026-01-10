@@ -267,6 +267,7 @@ public:
               const char *title,
               int32_t min_value,
               int32_t max_value,
+              bool publish_initial,
               int32_t initial_value,
               const char *initial_text,
               const char *min_label,
@@ -311,7 +312,7 @@ public:
     lv_obj_set_style_text_font(value_label_, &lv_font_montserrat_28, LV_PART_MAIN);
     lv_obj_set_width(value_label_, LV_PCT(100));
     lv_obj_set_style_text_align(value_label_, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_label_set_text(value_label_, initial_text != nullptr ? initial_text : "");
+    lv_label_set_text(value_label_, "");
     lv_obj_align_to(value_label_, arc_, LV_ALIGN_CENTER, 2, 8);
 
     if (min_label != nullptr && max_label != nullptr) {
@@ -328,7 +329,17 @@ public:
       lv_obj_align(max_value_label, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
     }
 
-    publish(initial_value, initial_text, millis());
+    has_value_ = false;
+    is_stale_ = false;
+    last_update_ms_ = 0;
+    value_ = min_value_;
+
+    if (publish_initial) {
+      publish(initial_value, initial_text, millis());
+    } else {
+      is_stale_ = true;
+      applyStale_();
+    }
   }
 
   void publish(int32_t value, const char *value_text, uint32_t now_ms) {
@@ -1210,15 +1221,16 @@ bool LiveDashboardImpl::build_from_json_(LiveDashboard &api, JsonObject root) {
         return false;
       }
 
-      if (!g["min"].is<int32_t>() || !g["max"].is<int32_t>() || !g["initial"].is<int32_t>() || !g["initial_text"].is<const char *>()) {
-        show_config_error_screen_("Missing/invalid: gauges[] range/initial");
+      if (!g["min"].is<int32_t>() || !g["max"].is<int32_t>()) {
+        show_config_error_screen_("Missing/invalid: gauges[] range");
         return false;
       }
 
       const int32_t min_value = g["min"].as<int32_t>();
       const int32_t max_value = g["max"].as<int32_t>();
-      const int32_t initial_value = g["initial"].as<int32_t>();
-      const char *initial_text = g["initial_text"].as<const char *>();
+      const bool publish_initial = g["initial"].is<int32_t>() || g["initial_text"].is<const char *>();
+      const int32_t initial_value = g["initial"].is<int32_t>() ? g["initial"].as<int32_t>() : min_value;
+      const char *initial_text = g["initial_text"].is<const char *>() ? g["initial_text"].as<const char *>() : "";
       const char *min_label = g["min_label"];
       const char *max_label = g["max_label"];
       const char *stale_text = g["stale_text"];
@@ -1264,6 +1276,7 @@ bool LiveDashboardImpl::build_from_json_(LiveDashboard &api, JsonObject root) {
                         title,
                         min_value,
                         max_value,
+                        publish_initial,
                         initial_value,
                         initial_text,
                         min_label,

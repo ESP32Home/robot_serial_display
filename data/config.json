@@ -25,8 +25,6 @@
       "title": "Voltage",
       "min": 90,
       "max": 130,
-      "initial": 121,
-      "initial_text": "12.1V",
       "min_label": "9V",
       "max_label": "13V",
       "accent": "green",
@@ -44,8 +42,6 @@
       "title": "CPU",
       "min": 0,
       "max": 100,
-      "initial": 37,
-      "initial_text": "37%",
       "min_label": "0%",
       "max_label": "100%",
       "accent": "amber"

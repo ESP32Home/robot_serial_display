@@ -71,7 +71,8 @@ Top-level keys used by the library:
     - each item: `{ "id": "tile_voltage" }`
     - to make a tile span multiple grid cells, repeat the same `id` in each cell of a rectangular region (non-rectangular repeats are rejected)
 - `gauges` (array, optional)
-  - each item (required keys): `id`, `tile_id`, `title`, `min`, `max`, `initial`, `initial_text`, `accent`
+  - each item (required keys): `id`, `tile_id`, `title`, `min`, `max`, `accent`
+  - optional: `initial`, `initial_text` — if omitted, the gauge starts “stale” (shows `stale_text` / `--`) until the first `publishGauge()`
   - optional: `min_label`, `max_label`, `stale_text`, `stages`
   - `stages` is an array of `{ "t": <threshold>, "c": <color> }` (higher thresholds should come first; the library sorts them)
 - `buttons` (array, optional)
