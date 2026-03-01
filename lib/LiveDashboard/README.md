@@ -50,6 +50,10 @@ ui.tick();  // handles stale gauges and optional JSONL replay
 
 If `LiveDashboardOptions.demo_replay == true`, `tick()` will read one line from `demo_path` every `demo_period_ms` and apply it via `ingestEventLine()`.
 
+- You can also enable/disable demo replay from `config.json` under `ui`:
+  - `ui.demo_replay` (bool, optional) — overrides `LiveDashboardOptions.demo_replay` if present
+  - `ui.demo_path` (string, optional) — overrides `LiveDashboardOptions.demo_path` if present
+  - `ui.demo_period_ms` (uint32, optional) — overrides `LiveDashboardOptions.demo_period_ms` if present
 - Missing `demo_path` file is a **fatal error** (dashboard init fails and shows an error screen).
 - Any external input via `ingestLine()` / `ingestEventLine()` stops JSONL replay immediately (so real data can take over).
 

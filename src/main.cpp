@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <cstdio>
+#include <cstring>
 
 #if defined(ARDUINO_ARCH_ESP32)
 #include "esp32-hal-psram.h"
@@ -16,6 +17,23 @@
 
 #ifndef ROVI_ENABLE_JSONL_DEMO_REPLAY
 #define ROVI_ENABLE_JSONL_DEMO_REPLAY 0
+#endif
+
+// Serial RX diagnostics (set via build flags, e.g. `-D ROVI_RX_STATS_ENABLE=1`).
+#ifndef ROVI_RX_LINE_TIMEOUT_MS
+#define ROVI_RX_LINE_TIMEOUT_MS 500U
+#endif
+
+#ifndef ROVI_RX_STATS_ENABLE
+#define ROVI_RX_STATS_ENABLE 0
+#endif
+
+#ifndef ROVI_RX_STATS_PERIOD_MS
+#define ROVI_RX_STATS_PERIOD_MS 60000U
+#endif
+
+#ifndef ROVI_RX_ERROR_HEX_DUMP
+#define ROVI_RX_ERROR_HEX_DUMP 0
 #endif
 
 static constexpr const char *kConfigPath = "/config.json";
@@ -123,18 +141,119 @@ static void poll_event_lines_from_serial() {
   static char rx[1024 + 1]{};
   static size_t rx_len = 0;
   static bool rx_drop = false;
+  static uint32_t last_rx_ms = 0;
+  static uint32_t last_stats_ms = 0;
+
+  static uint32_t ok_lines = 0;
+  static uint32_t ingest_fail = 0;
+  static uint32_t overflow_count = 0;
+  static uint32_t timeout_count = 0;
+  static uint32_t resync_count = 0;
+  static uint32_t dropped_bytes = 0;
+
+  auto dump_ascii = [&](const char *label, const char *buf, size_t len, bool suffix) {
+    if (buf == nullptr) return;
+    constexpr size_t kSnip = 80;
+    const size_t n = (len > kSnip) ? kSnip : len;
+    size_t start = 0;
+    if (suffix && len > kSnip) start = len - kSnip;
+
+    char out[kSnip + 1]{};
+    for (size_t i = 0; i < n; ++i) {
+      char ch = buf[start + i];
+      out[i] = (ch >= 32 && ch <= 126) ? ch : '.';
+    }
+    out[n] = '\0';
+
+    Serial.printf("EVENT: RX %s %s ascii(%u/%u): %s\n",
+                  label != nullptr ? label : "?",
+                  suffix ? "suffix" : "prefix",
+                  static_cast<unsigned>(n),
+                  static_cast<unsigned>(len),
+                  out);
+  };
+
+  auto dump_hex = [&](const char *label, const char *buf, size_t len, bool suffix) {
+    (void)label;
+    (void)buf;
+    (void)len;
+    (void)suffix;
+#if ROVI_RX_ERROR_HEX_DUMP
+    if (buf == nullptr) return;
+    constexpr size_t kBytes = 32;
+    const size_t n = (len > kBytes) ? kBytes : len;
+    size_t start = 0;
+    if (suffix && len > kBytes) start = len - kBytes;
+
+    // "AA " * 32 = 96 chars worst-case + null.
+    char out[kBytes * 3 + 1]{};
+    size_t o = 0;
+    for (size_t i = 0; i < n; ++i) {
+      const uint8_t b = static_cast<uint8_t>(buf[start + i]);
+      snprintf(out + o, sizeof(out) - o, "%02X%s", b, (i + 1 < n) ? " " : "");
+      o = strlen(out);
+      if (o + 4 >= sizeof(out)) break;
+    }
+    Serial.printf("EVENT: RX %s %s hex(%u/%u): %s\n",
+                  label != nullptr ? label : "?",
+                  suffix ? "suffix" : "prefix",
+                  static_cast<unsigned>(n),
+                  static_cast<unsigned>(len),
+                  out);
+#endif
+  };
+
+#if ROVI_RX_STATS_ENABLE
+  if (ROVI_RX_STATS_PERIOD_MS > 0) {
+    const uint32_t now_ms = millis();
+    if (last_stats_ms == 0) last_stats_ms = now_ms;
+    if (now_ms - last_stats_ms >= ROVI_RX_STATS_PERIOD_MS) {
+      Serial.printf("EVENT: RX stats ok=%u fail=%u overflow=%u timeout=%u resync=%u dropped=%u rx_len=%u drop=%u\n",
+                    static_cast<unsigned>(ok_lines),
+                    static_cast<unsigned>(ingest_fail),
+                    static_cast<unsigned>(overflow_count),
+                    static_cast<unsigned>(timeout_count),
+                    static_cast<unsigned>(resync_count),
+                    static_cast<unsigned>(dropped_bytes),
+                    static_cast<unsigned>(rx_len),
+                    rx_drop ? 1U : 0U);
+      last_stats_ms = now_ms;
+    }
+  }
+#endif
 
   while (Serial.available() > 0) {
+    const uint32_t now_ms = millis();
+    if ((rx_len > 0 || rx_drop) && last_rx_ms != 0 && (now_ms - last_rx_ms > ROVI_RX_LINE_TIMEOUT_MS)) {
+      Serial.printf("EVENT: RX line timeout, resetting (len=%u drop=%u)\n",
+                    static_cast<unsigned>(rx_len),
+                    rx_drop ? 1U : 0U);
+      ++timeout_count;
+      rx_len = 0;
+      rx_drop = false;
+      dropped_bytes = 0;
+    }
+
     int c = Serial.read();
     if (c < 0) {
       break;
     }
+    last_rx_ms = now_ms;
 
-    if (c == '\n') {
-      if (!rx_drop) {
+    // Accept LF, CR, or CRLF as line terminators.
+    if (c == '\n' || c == '\r') {
+      if (rx_drop) {
+        ++resync_count;
+        Serial.printf("EVENT: RX resynced after dropping %u bytes\n", static_cast<unsigned>(dropped_bytes));
+        dropped_bytes = 0;
+      } else {
         rx[rx_len] = '\0';
         if (rx_len > 0) {
-          g_dashboard.ingestLine(rx);
+          if (g_dashboard.ingestLine(rx)) {
+            ++ok_lines;
+          } else {
+            ++ingest_fail;
+          }
         }
       }
       rx_len = 0;
@@ -142,20 +261,25 @@ static void poll_event_lines_from_serial() {
       continue;
     }
 
-    if (c == '\r') {
-      continue;
-    }
-
     if (rx_drop) {
+      ++dropped_bytes;
       continue;
     }
 
     if (rx_len < 1024) {
       rx[rx_len++] = static_cast<char>(c);
     } else {
-      Serial.println("EVENT: RX line too long (max 1024), dropping");
+      ++overflow_count;
+      Serial.printf("EVENT: RX line too long (max 1024), dropping (rx_len=%u overflow=%u)\n",
+                    static_cast<unsigned>(rx_len),
+                    static_cast<unsigned>(overflow_count));
+      dump_ascii("buffer", rx, rx_len, false);
+      dump_ascii("buffer", rx, rx_len, true);
+      dump_hex("buffer", rx, rx_len, false);
+      dump_hex("buffer", rx, rx_len, true);
       rx_len = 0;
       rx_drop = true;
+      dropped_bytes = 0;
     }
   }
 }

@@ -1052,6 +1052,18 @@ bool LiveDashboardImpl::build_from_json_(LiveDashboard &api, JsonObject root) {
     if (splash["duration_ms"].is<uint32_t>()) splash_duration_ms_ = splash["duration_ms"].as<uint32_t>();
   }
 
+  // Optional JSONL demo replay flags from config (override begin() options if present).
+  if (ui["demo_replay"].is<bool>()) {
+    demo_replay_ = ui["demo_replay"].as<bool>();
+  }
+  const char *demo_path = ui["demo_path"];
+  if (demo_path != nullptr && demo_path[0] != '\0') {
+    copy_cstr(demo_path_, sizeof(demo_path_), demo_path);
+  }
+  if (ui["demo_period_ms"].is<uint32_t>()) {
+    demo_period_ms_ = ui["demo_period_ms"].as<uint32_t>();
+  }
+
   JsonObject layout = root["layout"].as<JsonObject>();
   if (layout.isNull() || !layout["cols"].is<uint8_t>() || !layout["rows"].is<uint8_t>()) {
     show_config_error_screen_("Missing/invalid: layout.(cols/rows)");

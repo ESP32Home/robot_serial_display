@@ -55,7 +55,8 @@ The sample includes a simple “event replay” demo:
 
 - `data/test.jsonl` is uploaded to internal FFat and can be replayed once per second (loops at EOF).
 - You can paste the same JSON lines into the serial monitor; the line is applied when a full newline is received.
-- Toggle JSONL replay via `ROVI_ENABLE_JSONL_DEMO_REPLAY` in `src/main.cpp`.
+- Line terminator can be `\\n`, `\\r`, or `\\r\\n`.
+- Toggle JSONL replay via `ROVI_ENABLE_JSONL_DEMO_REPLAY` in `src/main.cpp`, or via `ui.demo_replay` in `data/config.json` (uploaded to FFat as `/config.json`).
 - If JSONL replay is enabled and `/test.jsonl` is missing, the app fails hard and shows an error screen.
 
 Line format:
@@ -70,3 +71,8 @@ From the project folder:
 
 - `pio run -e esp32-s3-touch-lcd-35`
 - `pio run -e esp32-s3-touch-lcd-35 -t upload`
+
+Optional serial RX diagnostics (compile-time flags, see `src/main.cpp`):
+
+- Enable periodic RX stats: `-D ROVI_RX_STATS_ENABLE=1 -D ROVI_RX_STATS_PERIOD_MS=60000`
+- Enable hex dump on RX overflow: `-D ROVI_RX_ERROR_HEX_DUMP=1`

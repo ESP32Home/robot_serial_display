@@ -65,7 +65,7 @@
       "title": "Raspi System",
       "rows": [
         { "id": "mem_used", "label": "Mem", "target": 160, "polarity": "negative" },
-        { "id": "net_wlan0", "label": "WiFi", "type": "text" },
+        { "id": "wlan", "label": "WiFi", "type": "text" },
         { "id": "hz_driver", "label": "driver", "target": 10 },
         { "id": "hz_lidar", "label": "lidar", "target": 10 }
       ]
