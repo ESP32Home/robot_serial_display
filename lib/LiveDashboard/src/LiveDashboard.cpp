@@ -22,7 +22,7 @@ static const lv_color_t kStaleArc = lv_color_hex(0x475569);
 
 static constexpr size_t kMaxStagesPerGauge = 8;
 static constexpr size_t kEventLineMaxLen = 1024;
-static constexpr size_t kMaxEventsPerLine = 5;
+static constexpr size_t kMaxEventsPerLine = 10;
 static constexpr size_t kMaxHzRowsPerList = 6;
 
 struct Stage {
@@ -173,6 +173,8 @@ static lv_obj_t *create_tile_(lv_obj_t *parent) {
 }
 
 static void show_config_error_screen_(const char *fatal_message) {
+  Serial.printf("CONFIG ERROR: %s\n", (fatal_message != nullptr && fatal_message[0] != '\0') ? fatal_message : "Config not loaded");
+
   lv_obj_t *scr = lv_scr_act();
   lv_obj_clean(scr);
   lv_obj_set_style_bg_color(scr, lv_color_hex(0x0B1220), LV_PART_MAIN);
@@ -434,6 +436,7 @@ struct HzRowSlot {
   bool used = false;
   char id[LIVE_DASHBOARD_ID_MAX_LEN]{};
   char label[16]{};
+  bool text_only = false;
   int32_t target = 0;
   lv_obj_t *name_label = nullptr;
   lv_obj_t *value_label = nullptr;
@@ -638,7 +641,7 @@ void LiveDashboardImpl::tick() {
 
   for (size_t i = 0; i < hz_row_count_; ++i) {
     HzRowSlot &row = hz_rows_[i];
-    if (!row.used || row.bar == nullptr || row.value_label == nullptr || row.name_label == nullptr) {
+    if (!row.used || row.value_label == nullptr || row.name_label == nullptr) {
       continue;
     }
 
@@ -647,9 +650,11 @@ void LiveDashboardImpl::tick() {
       row.is_stale = true;
       lv_obj_set_style_text_color(row.name_label, kTextSecondary, LV_PART_MAIN);
       lv_obj_set_style_text_color(row.value_label, kTextSecondary, LV_PART_MAIN);
-      lv_label_set_text(row.value_label, "--");
-      lv_bar_set_value(row.bar, 0, LV_ANIM_OFF);
-      lv_obj_set_style_bg_color(row.bar, kStaleArc, LV_PART_INDICATOR);
+      lv_label_set_text(row.value_label, row.text_only ? "-" : "--");
+      if (row.bar != nullptr) {
+        lv_bar_set_value(row.bar, 0, LV_ANIM_OFF);
+        lv_obj_set_style_bg_color(row.bar, kStaleArc, LV_PART_INDICATOR);
+      }
     }
   }
 
@@ -704,13 +709,25 @@ bool LiveDashboardImpl::publishGauge(const char *gauge_id, int32_t value, const 
   }
 
   HzRowSlot *row = find_hz_row_(gauge_id);
-  if (row == nullptr || row->bar == nullptr || row->value_label == nullptr || row->name_label == nullptr) {
+  if (row == nullptr || row->value_label == nullptr || row->name_label == nullptr) {
     return false;
   }
 
   row->last_update_ms = millis();
   row->has_value = true;
   row->is_stale = false;
+
+  lv_obj_set_style_text_color(row->name_label, kTextPrimary, LV_PART_MAIN);
+  lv_obj_set_style_text_color(row->value_label, kTextPrimary, LV_PART_MAIN);
+  lv_label_set_text(row->value_label, text != nullptr ? text : "-");
+
+  if (row->text_only) {
+    return true;
+  }
+
+  if (row->bar == nullptr) {
+    return false;
+  }
 
   const int32_t target = row->target > 0 ? row->target : 1;
   int32_t ratio_permille = (value * 1000) / target;
@@ -724,9 +741,6 @@ bool LiveDashboardImpl::publishGauge(const char *gauge_id, int32_t value, const 
     color = lv_palette_main(LV_PALETTE_AMBER);
   }
 
-  lv_obj_set_style_text_color(row->name_label, kTextPrimary, LV_PART_MAIN);
-  lv_obj_set_style_text_color(row->value_label, kTextPrimary, LV_PART_MAIN);
-  lv_label_set_text(row->value_label, text);
   lv_bar_set_value(row->bar, ratio_permille, LV_ANIM_OFF);
   lv_obj_set_style_bg_color(row->bar, color, LV_PART_INDICATOR);
   return true;
@@ -859,14 +873,26 @@ bool LiveDashboardImpl::ingestEventLineInternal_(char *line) {
       return false;
     }
 
-    if (!obj["value"].is<int32_t>()) {
-      Serial.println("EVENT: missing/invalid value");
+    GaugeSlot *gauge = find_gauge_(id);
+    HzRowSlot *row = (gauge == nullptr) ? find_hz_row_(id) : nullptr;
+    if (gauge == nullptr && row == nullptr) {
+      Serial.printf("EVENT: unknown id: %s\n", id);
       return false;
     }
 
-    const int32_t value = obj["value"].as<int32_t>();
+    int32_t value = 0;
+    if (gauge != nullptr || (row != nullptr && !row->text_only)) {
+      if (!obj["value"].is<int32_t>()) {
+        Serial.println("EVENT: missing/invalid value");
+        return false;
+      }
+      value = obj["value"].as<int32_t>();
+    } else if (obj["value"].is<int32_t>()) {
+      value = obj["value"].as<int32_t>();
+    }
+
     if (!publishGauge(id, value, text)) {
-      Serial.printf("EVENT: unknown id: %s\n", id);
+      Serial.printf("EVENT: publish failed for id: %s\n", id);
       return false;
     }
 
@@ -1407,20 +1433,35 @@ bool LiveDashboardImpl::build_from_json_(LiveDashboard &api, JsonObject root) {
         JsonObject row_cfg = row_v.as<JsonObject>();
         const char *row_id = row_cfg["id"];
         const char *label = row_cfg["label"];
-        if (!row_cfg["target"].is<int32_t>()) {
-          show_config_error_screen_("Missing/invalid: hz_lists[].rows[].target");
+
+        const char *type_str = row_cfg["type"];
+        bool text_only = false;
+        if (type_str == nullptr || type_str[0] == '\0' || stricmp_(type_str, "hz") == 0) {
+          text_only = false;
+        } else if (stricmp_(type_str, "text") == 0) {
+          text_only = true;
+        } else {
+          show_config_error_screen_("Invalid: hz_lists[].rows[].type");
           return false;
         }
-        const int32_t target = row_cfg["target"].as<int32_t>();
 
-        if (row_id == nullptr || label == nullptr || target <= 0) {
+        int32_t target = 1;
+        if (!text_only) {
+          if (!row_cfg["target"].is<int32_t>()) {
+            show_config_error_screen_("Missing/invalid: hz_lists[].rows[].target");
+            return false;
+          }
+          target = row_cfg["target"].as<int32_t>();
+        }
+
+        if (row_id == nullptr || label == nullptr || (!text_only && target <= 0)) {
           show_config_error_screen_("Missing/invalid: hz_lists[].rows[]");
           return false;
         }
 
         lv_obj_t *row = lv_obj_create(list_container);
         lv_obj_set_width(row, LV_PCT(100));
-        lv_obj_set_height(row, 40);
+        lv_obj_set_height(row, text_only ? 32 : 40);
         lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, LV_PART_MAIN);
         lv_obj_set_style_border_width(row, 0, LV_PART_MAIN);
         lv_obj_set_style_pad_all(row, 0, LV_PART_MAIN);
@@ -1430,29 +1471,38 @@ bool LiveDashboardImpl::build_from_json_(LiveDashboard &api, JsonObject root) {
         lv_label_set_text(lbl_name, label);
         lv_obj_set_style_text_color(lbl_name, kTextSecondary, LV_PART_MAIN);
         lv_obj_set_style_text_font(lbl_name, &lv_font_montserrat_14, LV_PART_MAIN);
-        lv_obj_align(lbl_name, LV_ALIGN_TOP_LEFT, 0, 0);
+        lv_obj_align(lbl_name, text_only ? LV_ALIGN_LEFT_MID : LV_ALIGN_TOP_LEFT, 0, 0);
 
         lv_obj_t *lbl_value = lv_label_create(row);
-        lv_label_set_text(lbl_value, "--");
+        lv_label_set_text(lbl_value, text_only ? "-" : "--");
         lv_obj_set_style_text_color(lbl_value, kTextSecondary, LV_PART_MAIN);
         lv_obj_set_style_text_font(lbl_value, &lv_font_montserrat_14, LV_PART_MAIN);
-        lv_obj_align(lbl_value, LV_ALIGN_TOP_RIGHT, 0, 0);
+        lv_obj_align(lbl_value, text_only ? LV_ALIGN_RIGHT_MID : LV_ALIGN_TOP_RIGHT, 0, 0);
+        if (text_only) {
+          lv_label_set_long_mode(lbl_value, LV_LABEL_LONG_DOT);
+          lv_obj_set_width(lbl_value, LV_PCT(65));
+          lv_obj_set_style_text_align(lbl_value, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+        }
 
-        lv_obj_t *bar = lv_bar_create(row);
-        lv_obj_set_size(bar, LV_PCT(100), 8);
-        lv_bar_set_range(bar, 0, 1000);
-        lv_bar_set_value(bar, 0, LV_ANIM_OFF);
-        lv_obj_align(bar, LV_ALIGN_BOTTOM_MID, 0, 0);
-        lv_obj_set_style_bg_color(bar, kArcBg, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(bar, kStaleArc, LV_PART_INDICATOR);
-        lv_obj_set_style_radius(bar, 4, LV_PART_MAIN);
-        lv_obj_set_style_radius(bar, 4, LV_PART_INDICATOR);
-        lv_obj_set_style_border_width(bar, 0, LV_PART_MAIN);
+        lv_obj_t *bar = nullptr;
+        if (!text_only) {
+          bar = lv_bar_create(row);
+          lv_obj_set_size(bar, LV_PCT(100), 8);
+          lv_bar_set_range(bar, 0, 1000);
+          lv_bar_set_value(bar, 0, LV_ANIM_OFF);
+          lv_obj_align(bar, LV_ALIGN_BOTTOM_MID, 0, 0);
+          lv_obj_set_style_bg_color(bar, kArcBg, LV_PART_MAIN);
+          lv_obj_set_style_bg_color(bar, kStaleArc, LV_PART_INDICATOR);
+          lv_obj_set_style_radius(bar, 4, LV_PART_MAIN);
+          lv_obj_set_style_radius(bar, 4, LV_PART_INDICATOR);
+          lv_obj_set_style_border_width(bar, 0, LV_PART_MAIN);
+        }
 
         HzRowSlot &slot = hz_rows_[hz_row_count_];
         slot.used = true;
         copy_cstr(slot.id, sizeof(slot.id), row_id);
         copy_cstr(slot.label, sizeof(slot.label), label);
+        slot.text_only = text_only;
         slot.target = target;
         slot.name_label = lbl_name;
         slot.value_label = lbl_value;

@@ -1,5 +1,7 @@
 {"id":"voltage","value":126,"text":"12.6V"}
 {"id":"cpu","value":12,"text":"12%"}
+{"id":"mem_used","value":11,"text":"1.1GiB/16.0GiB"}
+{"id":"net_wlan0","text":"down"}
 [{"id":"hz_nav","value":20,"text":"20/20Hz"},{"id":"hz_slam","value":30,"text":"30/30Hz"},{"id":"hz_tf","value":50,"text":"50/50Hz"},{"id":"hz_cam","value":15,"text":"15/15Hz"},{"id":"hz_ctrl","value":60,"text":"60/60Hz"}]
 {"id":"hz_diag","value":1,"text":"1/1Hz"}
 [{"id":"voltage","value":111,"text":"11.1V"},{"id":"hz_nav","value":18,"text":"18/20Hz"},{"id":"hz_slam","value":24,"text":"24/30Hz"},{"id":"hz_tf","value":40,"text":"40/50Hz"},{"id":"hz_cam","value":10,"text":"10/15Hz"}]

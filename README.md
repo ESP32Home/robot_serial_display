@@ -62,7 +62,7 @@ Line format:
 
 - Single update: `{"id":"voltage","value":121,"text":"12.1V"}`
 - Multiple updates in one line: `[{"id":"voltage","value":121,"text":"12.1V"},{"id":"cpu","value":37,"text":"37%"}]`
-- Limits: max line length 1024 chars, max 5 events per line.
+- Limits: max line length 1024 chars, max 10 events per line.
 
 ## Build (PlatformIO)
 

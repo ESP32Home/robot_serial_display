@@ -40,7 +40,8 @@ ui.tick();  // handles stale gauges and optional JSONL replay
   - Accepts either an object or an array of objects:
     - `{"id":"voltage","value":121,"text":"12.1V"}`
     - `[{"id":"voltage","value":121,"text":"12.1V"},{"id":"cpu","value":37,"text":"37%"}]`
-  - Limits (hard errors): max line length 1024 chars; max 5 events per line; `text` is mandatory.
+  - Limits (hard errors): max line length 1024 chars; max 10 events per line; `text` is mandatory.
+  - `value` is required for gauges and `hz_lists` rows of `type:"hz"`, but optional for `hz_lists` rows of `type:"text"`.
   - Also stops JSONL replay (if enabled) after a line is successfully applied.
 - `bool onAction(const char* action_id, ActionCallback cb, void* user)`
   - Binds a C callback to buttons whose `action_id` matches.
@@ -81,8 +82,10 @@ Top-level keys used by the library:
   - each item: `tile_id`, `title`, `subtitle` (optional), `body`
 - `hz_lists` (array, optional)
   - each item: `tile_id`, `title`, `rows`
-  - `rows` is an array (max 6) of `{ "id": "hz_nav", "label": "nav", "target": 20 }`
-  - updates come from events by `id` (use `value` as current Hz, and `text` for display, e.g. `"18/20Hz"`); the bar is computed from `value/target` and capped at 100%
+  - `rows` is an array (max 6) of:
+    - Hz row: `{ "id": "hz_nav", "label": "nav", "target": 20 }` (optional `type:"hz"`)
+    - Text row: `{ "id": "net_wlan0", "label": "WiFi", "type": "text" }` (no `target`, no progress bar)
+  - updates come from events by `id` (use `text` for display; for Hz rows `value` drives the progress bar via `value/target`, capped at 100%)
 
 ## Notes
 

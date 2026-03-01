@@ -13,9 +13,9 @@
       { "id": "tile_voltage" },
       { "id": "tile_cpu" },
       { "id": "tile_hz" },
-      { "id": "tile_sys" },
+      { "id": "tile_shutdown" },
       { "id": "tile_hz" },
-      { "id": "tile_sys" }
+      { "id": "tile_restart" }
     ]
   },
   "gauges": [
@@ -47,27 +47,34 @@
       "accent": "amber"
     }
   ],
+  "buttons": [
+    {
+      "tile_id": "tile_shutdown",
+      "tile_title": "Power",
+      "label": "Shutdown",
+      "color": "red",
+      "action_id": "shutdown"
+    },
+    {
+      "tile_id": "tile_restart",
+      "tile_title": "System",
+      "label": "Restart",
+      "color": "blue",
+      "action_id": "restart"
+    }
+  ],
   "hz_lists": [
     {
       "id": "pipeline_hz",
       "tile_id": "tile_hz",
       "title": "Pipeline Hz",
       "rows": [
+        { "id": "hz_driver", "label": "driver", "target": 10 },
         { "id": "hz_depth", "label": "depth", "target": 15 },
         { "id": "hz_color", "label": "color", "target": 15 },
         { "id": "hz_slam", "label": "slam", "target": 30 },
-        { "id": "hz_nav", "label": "nav", "target": 20 }
-      ]
-    },
-    {
-      "id": "raspi_sys",
-      "tile_id": "tile_sys",
-      "title": "Raspi System",
-      "rows": [
-        { "id": "mem_used", "label": "Mem", "target": 16 },
-        { "id": "net_wlan0", "label": "WiFi", "type": "text" },
-        { "id": "hz_driver", "label": "driver", "target": 10 },
-        { "id": "hz_lidar", "label": "lidar", "target": 10 }
+        { "id": "hz_nav", "label": "nav", "target": 20 },
+        { "id": "hz_tf", "label": "tf", "target": 50 }
       ]
     }
   ]
