@@ -83,7 +83,7 @@ Top-level keys used by the library:
 - `hz_lists` (array, optional)
   - each item: `tile_id`, `title`, `rows`
   - `rows` is an array (max 6) of:
-    - Hz row: `{ "id": "hz_nav", "label": "nav", "target": 20 }` (optional `type:"hz"`)
+    - Hz row: `{ "id": "hz_nav", "label": "nav", "target": 20 }` (optional `type:"hz"`, optional `polarity:"negative"`)
     - Text row: `{ "id": "net_wlan0", "label": "WiFi", "type": "text" }` (no `target`, no progress bar)
   - updates come from events by `id` (use `text` for display; for Hz rows `value` drives the progress bar via `value/target`, capped at 100%)
 

@@ -437,6 +437,7 @@ struct HzRowSlot {
   char id[LIVE_DASHBOARD_ID_MAX_LEN]{};
   char label[16]{};
   bool text_only = false;
+  bool negative_polarity = false;
   int32_t target = 0;
   lv_obj_t *name_label = nullptr;
   lv_obj_t *value_label = nullptr;
@@ -735,10 +736,19 @@ bool LiveDashboardImpl::publishGauge(const char *gauge_id, int32_t value, const 
   if (ratio_permille > 1000) ratio_permille = 1000;
 
   lv_color_t color = lv_palette_main(LV_PALETTE_RED);
-  if (ratio_permille >= 900) {
+  if (row->negative_polarity) {
     color = lv_palette_main(LV_PALETTE_GREEN);
-  } else if (ratio_permille >= 700) {
-    color = lv_palette_main(LV_PALETTE_AMBER);
+    if (ratio_permille >= 900) {
+      color = lv_palette_main(LV_PALETTE_RED);
+    } else if (ratio_permille >= 700) {
+      color = lv_palette_main(LV_PALETTE_AMBER);
+    }
+  } else {
+    if (ratio_permille >= 900) {
+      color = lv_palette_main(LV_PALETTE_GREEN);
+    } else if (ratio_permille >= 700) {
+      color = lv_palette_main(LV_PALETTE_AMBER);
+    }
   }
 
   lv_bar_set_value(row->bar, ratio_permille, LV_ANIM_OFF);
@@ -1446,12 +1456,23 @@ bool LiveDashboardImpl::build_from_json_(LiveDashboard &api, JsonObject root) {
         }
 
         int32_t target = 1;
+        bool negative_polarity = false;
         if (!text_only) {
           if (!row_cfg["target"].is<int32_t>()) {
             show_config_error_screen_("Missing/invalid: hz_lists[].rows[].target");
             return false;
           }
           target = row_cfg["target"].as<int32_t>();
+
+          const char *polarity_str = row_cfg["polarity"];
+          if (polarity_str == nullptr || polarity_str[0] == '\0' || stricmp_(polarity_str, "positive") == 0) {
+            negative_polarity = false;
+          } else if (stricmp_(polarity_str, "negative") == 0) {
+            negative_polarity = true;
+          } else {
+            show_config_error_screen_("Invalid: hz_lists[].rows[].polarity");
+            return false;
+          }
         }
 
         if (row_id == nullptr || label == nullptr || (!text_only && target <= 0)) {
@@ -1503,6 +1524,7 @@ bool LiveDashboardImpl::build_from_json_(LiveDashboard &api, JsonObject root) {
         copy_cstr(slot.id, sizeof(slot.id), row_id);
         copy_cstr(slot.label, sizeof(slot.label), label);
         slot.text_only = text_only;
+        slot.negative_polarity = negative_polarity;
         slot.target = target;
         slot.name_label = lbl_name;
         slot.value_label = lbl_value;
