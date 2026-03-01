@@ -222,23 +222,14 @@ static void poll_event_lines_from_serial() {
   }
 #endif
 
+  // Drain UART RX buffer first. Timeout is handled after draining to avoid false positives
+  // when the main loop is busy (bytes can be queued in the UART while we're not reading).
   while (Serial.available() > 0) {
-    const uint32_t now_ms = millis();
-    if ((rx_len > 0 || rx_drop) && last_rx_ms != 0 && (now_ms - last_rx_ms > ROVI_RX_LINE_TIMEOUT_MS)) {
-      Serial.printf("EVENT: RX line timeout, resetting (len=%u drop=%u)\n",
-                    static_cast<unsigned>(rx_len),
-                    rx_drop ? 1U : 0U);
-      ++timeout_count;
-      rx_len = 0;
-      rx_drop = false;
-      dropped_bytes = 0;
-    }
-
     int c = Serial.read();
     if (c < 0) {
       break;
     }
-    last_rx_ms = now_ms;
+    last_rx_ms = millis();
 
     // Accept LF, CR, or CRLF as line terminators.
     if (c == '\n' || c == '\r') {
@@ -279,6 +270,21 @@ static void poll_event_lines_from_serial() {
       dump_hex("buffer", rx, rx_len, true);
       rx_len = 0;
       rx_drop = true;
+      dropped_bytes = 0;
+    }
+  }
+
+  // If a line started but no new bytes arrive for a while, reset so we don't wedge forever.
+  // Note: we base this on "time since last byte *read*", so it must run after draining.
+  if ((rx_len > 0 || rx_drop) && last_rx_ms != 0 && ROVI_RX_LINE_TIMEOUT_MS > 0) {
+    const uint32_t now_ms = millis();
+    if (now_ms - last_rx_ms > ROVI_RX_LINE_TIMEOUT_MS) {
+      Serial.printf("EVENT: RX line timeout, resetting (len=%u drop=%u)\n",
+                    static_cast<unsigned>(rx_len),
+                    rx_drop ? 1U : 0U);
+      ++timeout_count;
+      rx_len = 0;
+      rx_drop = false;
       dropped_bytes = 0;
     }
   }
