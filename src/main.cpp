@@ -15,6 +15,8 @@
 #include <ScreenshotController.h>
 #include <WsLcd35S3Hal.h>
 
+#include "rovi_serial_rx_stats.h"
+
 #ifndef ROVI_ENABLE_JSONL_DEMO_REPLAY
 #define ROVI_ENABLE_JSONL_DEMO_REPLAY 0
 #endif
@@ -291,6 +293,7 @@ static void poll_event_lines_from_serial() {
 }
 
 void setup() {
+  rovi::serial_rx_stats::configure_before_serial_begin();
   Serial.begin(115200);
   Serial.println("ROVI dashboard (config-driven) example");
   print_memory_stats("boot");
@@ -332,6 +335,8 @@ void setup() {
 }
 
 void loop() {
+  rovi::serial_rx_stats::tick();
+
   if (!g_dashboard_ready) {
     g_hal.loop();
     return;
